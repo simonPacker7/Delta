@@ -4,7 +4,7 @@
 
 <template>
     <header>
-        <h1 class="title">Delta</h1>
+        <h1 class="title">δ Delta</h1>
     </header>
 </template>
 
@@ -21,7 +21,7 @@ header {
     flex-direction: row;
     padding-left: 5%;
     /* background-color: rgb(54, 124, 147); */
-    background-color: var(--vt-c-black-soft);
+    background-color: #2c3e50;
     font-family: monospace;
 }
 

@@ -7,14 +7,14 @@ import LoginView from '@/components/landing/LoginView.vue';
 <template>
     <div class="landing">
         <div class="head">
-            <h2 class="motto text-muted">The mathematical symbol for change</h2>
+            <h2 class="motto text-muted">One letter at a time</h2>
             <WordAnimation></WordAnimation>
         </div>
         <div class="btnView">
-            <div>
+            <div class="boxDiv">
                 <LoginView></LoginView>
             </div>
-            <div>
+            <div class="boxDiv">
                 <RegisterView></RegisterView>
             </div>
         </div>
@@ -61,5 +61,11 @@ import LoginView from '@/components/landing/LoginView.vue';
     min-height: 3rem;
     font-family: monospace;
     font-size: 2rem;
+}
+
+.boxDiv{
+    border: 2px solid white;
+    padding: 10px;
+    border-radius: 0.375rem;
 }
 </style>

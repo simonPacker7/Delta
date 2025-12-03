@@ -12,8 +12,18 @@ import { RouterView } from 'vue-router'
 
 <style scoped>
 main {
-  /* Adjust for header height */
-  margin-top: 76px;
+  /* Adjust for header height (TODO: Adjust to actual height not this random amount) */
+  margin-top: 130px;
   width: 100%;
+}
+</style>
+
+<style>
+body {
+  background-color: #282828;
+  color: white;
+}
+.mono {
+  font-family: monospace !important;
 }
 </style>

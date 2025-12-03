@@ -65,6 +65,6 @@ onBeforeUnmount(() => {
 }
 
 .cursor {
-    border-bottom: 2px solid #000;
+    border-bottom: 2px solid white;
 }
 </style>

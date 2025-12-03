@@ -9,27 +9,45 @@ const userPassword = ref('');
 
 <template>
     <form>
-        <div class="mb-3">
+        <div class="title-group">
+            <label class="form-title mono">Register</label>
+        </div>
+        <div class="form-group">
             <label for="registerEmail" class="form-label mono">Email</label>
             <input v-model="userEmail" type="email" class="form-control" placeholder="me@company.com" id="registerEmail"
                 required />
         </div>
-        <div class="mb-3">
+        <div class="form-group">
             <label for="registerDisplayName" class="form-label mono">Display name</label>
             <input v-model="userDisplayName" class="form-control" type="text" id="registerDisplayName" required
                 maxlength="16" />
         </div>
-        <div class="mb-3">
+        <div class="form-group">
             <label for="registerPassword" class="form-label mono">Password</label>
             <input v-model="userPassword" type="password" class="form-control" id="registerPassword" required
                 minlength="8" />
         </div>
-        <button type="submit" class="btn btn-outline-dark">Join</button>
+        <button type="submit" class="btn mono">Join</button>
     </form>
 </template>
 
 <style scoped>
 form>button {
     width: 100%
+}
+.title-group{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 10px;
+}
+.form-group {
+    margin-bottom: 7px;
+}
+.form-label {
+    margin-right: 7px;
+}
+.form-title {
+    font-weight: bold;
 }
 </style>
