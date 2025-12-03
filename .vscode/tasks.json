@@ -1,0 +1,11 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "migrate db",
+            "type": "shell",
+            "problemMatcher": [],
+            "command": "docker compose -f docker-compose.local.yml run --rm migration update"
+        },
+    ]
+}

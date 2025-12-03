@@ -9,6 +9,44 @@ services:
     volumes:
       - ./frontend/app/src:/app/src:ro
 
+  db:
+    image: postgres:alpine
+    container_name: delta_postgres
+    restart: on-failure
+    environment:
+      - POSTGRES_DB=delta_db
+      - POSTGRES_USER=delta
+      - POSTGRES_PASSWORD=password123
+    ports:
+      - "5432:5432"
+    volumes:
+      - delta_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    
+  migration:
+    image: liquibase/liquibase:4.28.0
+    container_name: delta_db_migration
+    volumes:
+      - ./db/migration:/liquibase/changelog
+    working_dir: /liquibase/changelog/
+    environment:
+      - LIQUIBASE_COMMAND_URL=jdbc:postgresql://db:5432/delta_db
+      - LIQUIBASE_COMMAND_USERNAME=delta
+      - LIQUIBASE_COMMAND_PASSWORD=password123
+      - LIQUIBASE_COMMAND_CHANGELOG_FILE=changelog-root.xml
+    depends_on:
+      db:
+        condition: service_healthy
+
+  redis:
+    image: redis:8-alpine
+    container_name: delta_redis
+    ports:
+      - "6379:6379"
 
   gateway:
     image: nginx:alpine
@@ -19,3 +57,7 @@ services:
       - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       - frontend
+
+volumes:
+  delta_postgres_data:
+    name: delta_postgres_data

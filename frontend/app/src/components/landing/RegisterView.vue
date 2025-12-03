@@ -14,7 +14,7 @@ const userPassword = ref('');
         </div>
         <div class="form-group">
             <label for="registerEmail" class="form-label mono">Email</label>
-            <input v-model="userEmail" type="email" class="form-control" placeholder="me@company.com" id="registerEmail"
+            <input v-model="userEmail" type="email" class="form-control" id="registerEmail"
                 required />
         </div>
         <div class="form-group">
