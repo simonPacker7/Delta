@@ -1,14 +1,21 @@
 <script setup lang="ts">
+import router from '@/router';
+import { useSessionStore } from '@/stores/session';
 import { ref } from 'vue';
 
 const userEmail = ref('');
 const userDisplayName = ref('');
 const userPassword = ref('');
+const sendRegister = useSessionStore().registerUser;
 
+const register = async () => {
+    await sendRegister({ email: userEmail.value, name: userDisplayName.value, password: userPassword.value })
+    router.push('/home')
+}
 </script>
 
 <template>
-    <form>
+    <form @submit.prevent="register">
         <div class="title-group">
             <label class="form-title mono">Register</label>
         </div>

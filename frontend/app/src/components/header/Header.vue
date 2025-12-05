@@ -1,10 +1,16 @@
 <script setup lang="ts">
+import navBar from "./NavBar.vue"
+import userNavBar from "./UserNavBar.vue"
+import { useSessionStore } from "@/stores/session"
 
+const sessionStore = useSessionStore()
 </script>
 
 <template>
     <header>
         <h1 class="title">δ Delta</h1>
+        <navBar v-if="sessionStore.authenticated" />
+        <userNavBar v-if="sessionStore.authenticated" />
     </header>
 </template>
 

@@ -1,12 +1,20 @@
 <script setup lang="ts">
+import router from '@/router';
+import { useSessionStore } from '@/stores/session';
 import { ref } from 'vue';
 
 const userEmail = ref('');
 const userPassword = ref('');
+const sendLogin = useSessionStore().loginUser;
+
+const login = async() => {
+    await sendLogin({ email: userEmail.value, password: userPassword.value });
+    router.push('/home');
+}
 </script>
 
 <template>
-    <form>
+    <form @submit.prevent="login">
         <div class="title-group">
             <label class="form-title mono">Login</label>
         </div>

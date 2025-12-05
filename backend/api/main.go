@@ -48,12 +48,13 @@ func main() {
 		log.Println(err)
 	}
 
+	app := fiber.New()
+
 	// Create services
 	auth := authService.NewService(pClient)
 	session := sessionService.NewService(rClient, &redisConfig)
 	users := userService.NewService(pClient)
 
-	app := fiber.New()
 	// Create endpoints
 	routes.AuthRouter(app.Group("/api/auth"), auth, session)
 	routes.UserRouter(app.Group("/api/user"), users, session)

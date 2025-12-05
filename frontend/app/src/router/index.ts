@@ -1,5 +1,7 @@
 import Landing from '@/views/landing/Landing.vue'
+import Home from '@/views/home/Home.vue'
 import { createRouter, createWebHistory } from 'vue-router'
+import { createAuthGuard } from './guards'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -7,8 +9,14 @@ const router = createRouter({
     {
       path: '/',
       component: Landing,
-    }
+    },
+    {
+      path: '/home',
+      component: Home,
+    },
   ],
 })
+
+router.beforeEach(createAuthGuard());
 
 export default router
