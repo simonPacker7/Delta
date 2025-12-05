@@ -1,0 +1,24 @@
+FROM golang:1.25.4
+
+WORKDIR /app
+
+COPY ./go.mod ./go.sum ./api/
+
+# Copy any shared code
+COPY ../shared ./shared
+
+WORKDIR /app/api
+
+# Download dependencies
+RUN go mod download
+
+# Copy the current directory to the WORKDIR in the image
+COPY . .
+
+# Build the server
+RUN go build -o /api
+
+EXPOSE 8080
+
+# Run the executable
+CMD ["/api"]
