@@ -57,6 +57,8 @@ Ensure you have the following installed:
 # Architecture
 This project uses a microservices architecture
 
+![Network Diagram](documentation/images/DeltaNetworkImage1.png)
+
 ### Data Storage
 ***Redis*** is used to store hot data:
 - Live game data
