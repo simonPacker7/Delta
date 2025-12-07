@@ -21,6 +21,7 @@ export const useSessionStore = defineStore("session", () => {
         try {
             const res = await axios.get('/api/user/profile')
             if (!res || res.status != 200 || !res.data || !res.data.email || !res.data.name) {
+                authenticated.value = false;
                 return
             }
             email.value = res.data.email
@@ -40,6 +41,7 @@ export const useSessionStore = defineStore("session", () => {
         }
         return authenticated.value
     }
+
     const registerUser = async (input: { email: string, name: string, password: string }) => {
         await axios.post('/api/auth/register', input);
         await syncUserProfile();

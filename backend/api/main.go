@@ -20,13 +20,13 @@ func main() {
 		port = "8080"
 	}
 
+	redisURL := os.Getenv("REDIS_URL")
+	redisPassword := os.Getenv("REDIS_PASSWORD")
+
 	dbURL := os.Getenv("DATABASE_URL")
 	dbName := os.Getenv("DATABASE_NAME")
 	dbUsername := os.Getenv("DATABASE_USERNAME")
 	dbPassword := os.Getenv("DATABASE_PASSWORD")
-
-	redisURL := os.Getenv("REDIS_URL")
-	redisPassword := os.Getenv("REDIS_PASSWORD")
 
 	var redisConfig = redisclient.RedisConfig{
 		Addr:     redisURL,

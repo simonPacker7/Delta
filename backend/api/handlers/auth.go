@@ -10,6 +10,21 @@ import (
 	"github.com/simonPacker7/Delta/backend/shared/entities"
 )
 
+// Guards endpoints in the API
+func AuthRoute(sess *sessionService.Service) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		sessionCtx, err := sess.GetSession(c)
+
+		if err != nil {
+			return c.SendStatus(fiber.StatusUnauthorized)
+		}
+
+		c.Locals("user", sessionCtx.Email)
+		c.Locals("sessionContext", sessionCtx)
+		return c.Next()
+	}
+}
+
 func RegisterUser(auth *authService.Service, sess *sessionService.Service) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		var requestBody entities.RegisterUserInput
@@ -72,20 +87,5 @@ func LogoutUser(sess *sessionService.Service) fiber.Handler {
 		sess.DestorySession(c)
 
 		return c.SendStatus(200)
-	}
-}
-
-// Guards endpoints in the API
-func AuthRoute(sess *sessionService.Service) fiber.Handler {
-	return func(c *fiber.Ctx) error {
-		sessionCtx, err := sess.GetSession(c)
-
-		if err != nil {
-			return c.SendStatus(fiber.StatusUnauthorized)
-		}
-
-		c.Locals("user", sessionCtx.Email)
-		c.Locals("sessionContext", sessionCtx)
-		return c.Next()
 	}
 }
