@@ -2,6 +2,12 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "start all services",
+            "type": "shell",
+            "problemMatcher": [],
+            "command": "docker compose -f docker-compose.local.yml up -d --build"
+        },
+        {
             "label": "migrate db",
             "type": "shell",
             "problemMatcher": [],
