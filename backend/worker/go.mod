@@ -1,4 +1,4 @@
-module github.com/simonPacker7/Delta/backend/api
+module github.com/simonPacker7/Delta/backend/worker
 
 go 1.25.4
 

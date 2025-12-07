@@ -2,9 +2,9 @@ package routes
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/simonPacker7/Delta/backend/api/handlers"
-	sessionService "github.com/simonPacker7/Delta/backend/api/services/session"
-	userService "github.com/simonPacker7/Delta/backend/api/services/user"
+	"github.com/simonPacker7/Delta/backend/worker/handlers"
+	sessionService "github.com/simonPacker7/Delta/backend/worker/services/session"
+	userService "github.com/simonPacker7/Delta/backend/worker/services/user"
 )
 
 func UserRouter(app fiber.Router, users *userService.Service, sess *sessionService.Service) {

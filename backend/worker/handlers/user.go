@@ -4,8 +4,8 @@ import (
 	"net/http"
 
 	"github.com/gofiber/fiber/v2"
-	userService "github.com/simonPacker7/Delta/backend/api/services/user"
 	"github.com/simonPacker7/Delta/backend/shared/entities"
+	userService "github.com/simonPacker7/Delta/backend/worker/services/user"
 )
 
 func GetUserProfile(users *userService.Service) fiber.Handler {

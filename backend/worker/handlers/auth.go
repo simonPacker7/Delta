@@ -5,9 +5,9 @@ import (
 	"net/http"
 
 	"github.com/gofiber/fiber/v2"
-	authService "github.com/simonPacker7/Delta/backend/api/services/auth"
-	sessionService "github.com/simonPacker7/Delta/backend/api/services/session"
 	"github.com/simonPacker7/Delta/backend/shared/entities"
+	authService "github.com/simonPacker7/Delta/backend/worker/services/auth"
+	sessionService "github.com/simonPacker7/Delta/backend/worker/services/session"
 )
 
 // Guards endpoints in the API

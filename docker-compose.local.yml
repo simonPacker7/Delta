@@ -48,11 +48,11 @@ services:
     ports:
       - "6379:6379"
 
-  api:
+  worker:
     build:
       context: ./backend
-      dockerfile: Dockerfile.API.local
-    container_name: delta_api
+      dockerfile: Dockerfile.worker.local
+    container_name: delta_worker
     environment:
       - API_PORT=8080
       - DATABASE_URL=db:5432
@@ -75,7 +75,7 @@ services:
       - ./gateway/certs:/etc/nginx/certs:ro
     depends_on:
       - frontend
-      - api
+      - worker
 
 volumes:
   delta_postgres_data:

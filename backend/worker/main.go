@@ -5,12 +5,12 @@ import (
 	"os"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/simonPacker7/Delta/backend/api/routes"
-	authService "github.com/simonPacker7/Delta/backend/api/services/auth"
-	sessionService "github.com/simonPacker7/Delta/backend/api/services/session"
-	userService "github.com/simonPacker7/Delta/backend/api/services/user"
 	"github.com/simonPacker7/Delta/backend/shared/postgresclient"
 	"github.com/simonPacker7/Delta/backend/shared/redisclient"
+	"github.com/simonPacker7/Delta/backend/worker/routes"
+	authService "github.com/simonPacker7/Delta/backend/worker/services/auth"
+	sessionService "github.com/simonPacker7/Delta/backend/worker/services/session"
+	userService "github.com/simonPacker7/Delta/backend/worker/services/user"
 )
 
 func main() {
