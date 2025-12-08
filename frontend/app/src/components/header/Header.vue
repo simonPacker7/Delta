@@ -8,7 +8,7 @@ const sessionStore = useSessionStore()
 
 <template>
     <header>
-        <h1 class="title">δ Delta</h1>
+        <h1 class="title">Delta</h1>
         <navBar v-if="sessionStore.authenticated" />
         <userNavBar v-if="sessionStore.authenticated" />
     </header>
