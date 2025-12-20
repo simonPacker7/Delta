@@ -1,8 +1,7 @@
 # Delta
 Delta is a turn-based online word game where players compete to transform a starter word into a new word by changing one letter at a time.
 
-This project is for me to learn and pratice my skills.
-
+**WORK IN PROGRESS**
 
 # Table of Contents
 - [Gettings Started](#getting-started)
@@ -62,22 +61,22 @@ Ensure you have the following installed:
 ![Network Diagram](documentation/images/DeltaNetworkImage1.png)
 
 ### Data Storage
-***Redis*** is used to store hot data:
+***Redis*** stores hot data:
 - Live game data
 - Matchmaking queue
 - User sessions
 - Pub/Sub
 
-***Postgres*** is used to store persistent data:
+***Postgres*** stores persistent data:
 - Game history
 - User credentials and profile
 
 ### Services
-***Worker*** -> handles user authentication, matchmaking, fetching game data and validating game moves
+**Worker** -> User authentication, profile management, matchmaking, querying historical game data
 
-***Parrot*** -> holds websocket connections and acts as a real-time event delivery system between services and clients
+**Game** -> Websocket handling & game logic
 
-***Updater*** -> ends games when a move has not been made after 100 seconds
+**Updater** -> Ends games when a move has not been made after 100 seconds
 
 
 # References

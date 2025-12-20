@@ -1,4 +1,4 @@
-module github.com/simonPacker7/Delta/backend/parrot
+module github.com/simonPacker7/Delta/backend/game-service
 
 go 1.25.4
 

@@ -1,0 +1,20 @@
+FROM golang:1.25.4
+
+WORKDIR /app
+
+COPY game-service/go.mod game-service/go.sum ./game-service/
+
+WORKDIR /app/game-service
+
+# Download dependencies
+RUN go mod download
+
+COPY game-service/ .
+
+# Build the server
+RUN go build -o /game-service
+
+EXPOSE 8080
+
+# Run the executable
+CMD ["/game-service"]
