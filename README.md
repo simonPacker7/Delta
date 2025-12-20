@@ -22,41 +22,43 @@ Ensure you have the following installed:
 
 ### Setup Development Environment
 1. Clone repo
-1. Install Local dependencies
-    - Navigate to the vue app directory
+1. Install local dependencies
+    
+    Navigate to vue app directory
     ```
     cd frontend/app
     ```
-    - Install dependencies
+    Install dependencies
     ```
     npm install
     ```
-1. Create SSL Certificates
-    - Create a folder called certs
+1. Create SSL certificates
+    
+    Create a folder called certs
     ```
     mkdir -p gateway/certs
     ```
-    - Generate certificates
+    Generate certificates
     ```
     openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
         -keyout gateway/certs/localhost.key \
         -out gateway/certs/localhost.crt
     ```
 1. Start the application
-    - Build and start all services using Docker Compose:
+    
+    Build and start all services using Docker Compose:
     ```
     docker compose -f docker-compose.local.yml up -d --build
     ```
 
-1. Run Database Migration
-    - The database starts empty. You need to apply the schema using Liquibase. Run this command
+1. Run database migration
+    
+    The database starts empty. You need to apply the schema using Liquibase. Run this command
     ```
     docker compose -f docker-compose.local.yml --rm migration update
     ```
 
 # Architecture
-This project uses a microservices architecture
-
 ![Network Diagram](documentation/images/DeltaNetworkImage1.png)
 
 ### Data Storage
