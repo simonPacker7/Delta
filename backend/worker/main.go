@@ -9,8 +9,10 @@ import (
 	"github.com/simonPacker7/Delta/backend/shared/redisclient"
 	"github.com/simonPacker7/Delta/backend/worker/routes"
 	authService "github.com/simonPacker7/Delta/backend/worker/services/auth"
+	gameService "github.com/simonPacker7/Delta/backend/worker/services/game"
 	sessionService "github.com/simonPacker7/Delta/backend/worker/services/session"
 	userService "github.com/simonPacker7/Delta/backend/worker/services/user"
+	wordService "github.com/simonPacker7/Delta/backend/worker/services/word"
 )
 
 func main() {
@@ -54,10 +56,13 @@ func main() {
 	auth := authService.NewService(pClient)
 	session := sessionService.NewService(rClient, &redisConfig)
 	users := userService.NewService(pClient)
+	words := wordService.NewService("../shared/assets/4-WordMap.json")
+	game := gameService.NewService(rClient, words)
 
 	// Create endpoints
 	routes.AuthRouter(app.Group("/api/auth"), auth, session)
 	routes.UserRouter(app.Group("/api/user"), users, session)
+	routes.GameRouter(app.Group("/api/game"), game, session)
 
 	app.Listen(":" + port)
 }

@@ -76,7 +76,7 @@ Ensure you have the following installed:
 
 **Game** -> Websocket handling & game logic
 
-**Updater** -> Ends games when a move has not been made after 100 seconds
+**Arbiter** -> Ends games when a move has not been made after 100 seconds
 
 
 # References
