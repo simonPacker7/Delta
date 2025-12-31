@@ -2,11 +2,10 @@ FROM golang:1.25.4
 
 WORKDIR /app
 
-# Copy shared modules first
-COPY shared/ ./shared/
-
-# Copy game-service
 COPY game-service/go.mod game-service/go.sum ./game-service/
+
+# Copy shared modules
+COPY shared/ ./shared/
 
 WORKDIR /app/game-service
 

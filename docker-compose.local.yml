@@ -60,6 +60,7 @@ services:
       - DATABASE_USERNAME=delta
       - DATABASE_PASSWORD=password123
       - REDIS_URL=redis:6379
+      - WORD_MAP_PATH=/app/assets/4-WordMap.json
     depends_on:
       - db
       - redis

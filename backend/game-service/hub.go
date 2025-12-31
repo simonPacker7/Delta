@@ -57,9 +57,9 @@ type ClientActionRequest struct {
 
 func createHub(rdb *redis.Client, redisClient *redisclient.RedisClient, wordService *word.Service) *Hub {
 	return &Hub{
-		actions:     make(chan *ClientActionRequest),
-		register:    make(chan *Client),
-		unregister:  make(chan *Client),
+		actions:     make(chan *ClientActionRequest, 256),
+		register:    make(chan *Client, 256),
+		unregister:  make(chan *Client, 256),
 		games:       make(map[string]map[*Client]bool),
 		clients:     make(map[string]*Client),
 		rdb:         rdb,
@@ -96,23 +96,18 @@ func (h *Hub) handleRegister(client *Client) {
 }
 
 func (h *Hub) handleUnregister(client *Client) {
+	// First, leave any game (updates Redis connected_count)
+	if client.GameID != "" {
+		h.leaveGameInternal(client)
+	}
+
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	// Remove from clients map
+	// Remove from clients map and close send channel
 	if _, ok := h.clients[client.UserID]; ok {
 		delete(h.clients, client.UserID)
 		close(client.Send)
-	}
-
-	// Remove from any game they were in
-	if client.GameID != "" {
-		if gameClients, ok := h.games[client.GameID]; ok {
-			delete(gameClients, client)
-			if len(gameClients) == 0 {
-				delete(h.games, client.GameID)
-			}
-		}
 	}
 
 	log.Printf("Client unregistered: %s", client.UserID)
@@ -184,6 +179,7 @@ func (h *Hub) handleJoinGame(client *Client, gameID string) {
 				"player1Name":   game.Player1Name,
 				"player2Id":     game.Player2ID,
 				"player2Name":   game.Player2Name,
+				"startWord":     game.CurrentWord,
 			},
 		})
 	}
@@ -266,6 +262,12 @@ func (h *Hub) handleSubmitWord(client *Client, gameID string, word string) {
 		return
 	}
 
+	// Get the player name from game state
+	playerName := game.Player1Name
+	if client.UserID == game.Player2ID {
+		playerName = game.Player2Name
+	}
+
 	log.Printf("Client %s submitted word '%s' for game %s, next turn: %s", client.UserID, word, gameID, nextTurnID)
 
 	// Broadcast the move to all clients in this game
@@ -274,6 +276,7 @@ func (h *Hub) handleSubmitWord(client *Client, gameID string, word string) {
 		GameID: gameID,
 		Payload: map[string]interface{}{
 			"playerId":      client.UserID,
+			"playerName":    playerName,
 			"word":          newWord,
 			"currentTurnId": nextTurnID,
 		},
@@ -319,23 +322,38 @@ func (h *Hub) broadcastGameMessage(gameID string, msg GameMessage) {
 // BroadcastToGame sends a message to all clients in a game
 func (h *Hub) BroadcastToGame(gameID string, message []byte) {
 	h.mu.RLock()
-	clients, ok := h.games[gameID]
-	h.mu.RUnlock()
-
+	gameClients, ok := h.games[gameID]
 	if !ok {
+		h.mu.RUnlock()
 		return
 	}
 
-	for client := range clients {
+	// Copy client list to avoid holding lock during send
+	clientList := make([]*Client, 0, len(gameClients))
+	for client := range gameClients {
+		clientList = append(clientList, client)
+	}
+	h.mu.RUnlock()
+
+	// Send to each client, collect failures
+	var failedClients []*Client
+	for _, client := range clientList {
 		select {
 		case client.Send <- message:
 		default:
-			// Buffer full, remove client
-			h.mu.Lock()
-			close(client.Send)
-			delete(h.games[gameID], client)
-			delete(h.clients, client.UserID)
-			h.mu.Unlock()
+			// Buffer full, mark for removal
+			failedClients = append(failedClients, client)
+		}
+	}
+
+	// Clean up failed clients (send to unregister channel to handle properly)
+	for _, client := range failedClients {
+		log.Printf("Client %s buffer full, scheduling disconnect", client.UserID)
+		// Don't block if unregister channel is full
+		select {
+		case h.unregister <- client:
+		default:
+			log.Printf("Unregister channel full for client %s", client.UserID)
 		}
 	}
 }

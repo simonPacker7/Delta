@@ -14,6 +14,9 @@ RUN go mod download
 
 COPY worker/ .
 
+# Copy wordmap asset
+COPY shared/assets/4-WordMap.json /app/assets/4-WordMap.json
+
 # Build the server
 RUN go build -o /worker
 

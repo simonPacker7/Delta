@@ -142,7 +142,6 @@ redis.call('SADD', wordsKey, startWord)
 redis.call('EXPIRE', wordsKey, 86400)
 
 redis.call('DEL', codeKey)
-redis.call('PUBLISH', gameKey, 'game_ready')
 
 return {gameId, player1Id, ''}
 `
@@ -213,7 +212,6 @@ for i = 1, maxAttempts do
         redis.call('SADD', wordsKey, startWord)
         redis.call('EXPIRE', wordsKey, 86400)
         
-        redis.call('PUBLISH', gameKey, 'game_ready')
         return {gameId, player1Id, true}
     end
 end
@@ -331,8 +329,9 @@ for i, gameId in ipairs(expired) do
         -- Remove from expire set
         redis.call('ZREM', expireSet, gameId)
         
-        -- Publish event
-        redis.call('PUBLISH', gameKey, 'game_ended_timeout')
+        -- Publish JSON event for clients
+        local jsonMsg = '{"type":"game_ended","gameId":"' .. gameId .. '","payload":{"winnerId":"' .. winnerId .. '","reason":"timeout"}}'
+        redis.call('PUBLISH', gameKey, jsonMsg)
         
         -- Add to results
         table.insert(results, {gameId, winnerId})
@@ -437,22 +436,25 @@ if not status then
     return {-1, false, 'game_not_found'}
 end
 
--- Only allow joining games in ready or active status
-if status ~= 'ready' and status ~= 'active' then
+-- Allow joining games in waiting (player1 before match), ready (both matched), or active (reconnect)
+if status ~= 'waiting' and status ~= 'ready' and status ~= 'active' then
     return {-1, false, 'game_not_joinable'}
 end
 
 local newCount = redis.call('HINCRBY', gameKey, 'connected_count', 1)
 
--- If both players connected and game is ready, start the game
+-- Only start the game when:
+-- 1. Both players are connected (count == 2)
+-- 2. Status is 'ready' (both players have been matched via matchmaking)
 if newCount == 2 and status == 'ready' then
     redis.call('HSET', gameKey, 'status', 'active')
     
     -- Add to expiration queue
-    local expireAt = redis.call('TIME')[1] + turnTimeout
-    redis.call('ZADD', expireSet, expireAt, string.gsub(gameKey, 'game:', ''))
+    local timeResult = redis.call('TIME')
+    local expireAt = tonumber(timeResult[1]) + tonumber(turnTimeout)
+    local gameId = string.gsub(gameKey, 'game:', '')
+    redis.call('ZADD', expireSet, expireAt, gameId)
     
-    redis.call('PUBLISH', gameKey, 'game_started')
     return {newCount, true, ''}
 end
 
@@ -535,13 +537,11 @@ redis.call('HSET', gameKey,
 )
 
 -- Reset turn timer
-local expireAt = redis.call('TIME')[1] + turnTimeout
+local timeResult = redis.call('TIME')
+local expireAt = tonumber(timeResult[1]) + tonumber(turnTimeout)
 local gameId = string.gsub(gameKey, 'game:', '')
 redis.call('ZREM', expireSet, gameId)
 redis.call('ZADD', expireSet, expireAt, gameId)
-
--- Publish update
-redis.call('PUBLISH', gameKey, 'word_submitted')
 
 return {true, newWord, nextTurnId, ''}
 `
