@@ -113,6 +113,7 @@ if not gameId then
 end
 
 local gameKey = 'game:' .. gameId
+local wordsKey = gameKey .. ':words'
 local status = redis.call('HGET', gameKey, 'status')
 if status ~= 'waiting' then
     return {'', '', 'game_not_available'}
@@ -135,6 +136,11 @@ redis.call('HSET', gameKey,
     'current_word', startWord,
     'current_turn_id', player1Id
 )
+
+-- Initialize played words set with starting word
+redis.call('SADD', wordsKey, startWord)
+redis.call('EXPIRE', wordsKey, 86400)
+
 redis.call('DEL', codeKey)
 redis.call('PUBLISH', gameKey, 'game_ready')
 
@@ -182,6 +188,7 @@ for i = 1, maxAttempts do
     end
 
     local gameKey = 'game:' .. gameId
+    local wordsKey = gameKey .. ':words'
     local status = redis.call('HGET', gameKey, 'status')
     local player1Id = redis.call('HGET', gameKey, 'player1_id')
 
@@ -201,6 +208,11 @@ for i = 1, maxAttempts do
             'current_word', startWord,
             'current_turn_id', player1Id
         )
+        
+        -- Initialize played words set with starting word
+        redis.call('SADD', wordsKey, startWord)
+        redis.call('EXPIRE', wordsKey, 86400)
+        
         redis.call('PUBLISH', gameKey, 'game_ready')
         return {gameId, player1Id, true}
     end
@@ -411,4 +423,165 @@ func (r *RedisClient) EndGameByTimeout(gameID string, winnerID string) error {
 		"winner_id", winnerID,
 		"end_reason", "timeout",
 	).Err()
+}
+
+// AtomicJoinGameSession atomically increments connected_count and starts game if both players connected
+// Returns: newConnectedCount, gameStarted, error
+var joinGameSessionScript = `
+local gameKey = KEYS[1]
+local expireSet = KEYS[2]
+local turnTimeout = ARGV[1]
+
+local status = redis.call('HGET', gameKey, 'status')
+if not status then
+    return {-1, false, 'game_not_found'}
+end
+
+-- Only allow joining games in ready or active status
+if status ~= 'ready' and status ~= 'active' then
+    return {-1, false, 'game_not_joinable'}
+end
+
+local newCount = redis.call('HINCRBY', gameKey, 'connected_count', 1)
+
+-- If both players connected and game is ready, start the game
+if newCount == 2 and status == 'ready' then
+    redis.call('HSET', gameKey, 'status', 'active')
+    
+    -- Add to expiration queue
+    local expireAt = redis.call('TIME')[1] + turnTimeout
+    redis.call('ZADD', expireSet, expireAt, string.gsub(gameKey, 'game:', ''))
+    
+    redis.call('PUBLISH', gameKey, 'game_started')
+    return {newCount, true, ''}
+end
+
+return {newCount, false, ''}
+`
+
+func (r *RedisClient) AtomicJoinGameSession(gameID string) (int, bool, error) {
+	gameKey := gameKeyPrefix + gameID
+	result, err := r.client.Eval(ctx, joinGameSessionScript, []string{gameKey, gameExpireSet}, turnTimeoutSeconds).Result()
+	if err != nil {
+		return 0, false, err
+	}
+
+	arr, ok := result.([]interface{})
+	if !ok || len(arr) != 3 {
+		return 0, false, nil
+	}
+
+	count, _ := arr[0].(int64)
+	started := false
+	if s, ok := arr[1].(int64); ok {
+		started = s == 1
+	}
+	errMsg, _ := arr[2].(string)
+
+	if errMsg != "" {
+		return 0, false, &AtomicOperationError{Message: errMsg}
+	}
+
+	return int(count), started, nil
+}
+
+// AtomicLeaveGameSession decrements connected_count when a player disconnects
+func (r *RedisClient) AtomicLeaveGameSession(gameID string) error {
+	gameKey := gameKeyPrefix + gameID
+	return r.client.HIncrBy(ctx, gameKey, "connected_count", -1).Err()
+}
+
+// AtomicSubmitWord atomically validates and applies a word submission
+// Returns: success, newWord, nextTurnPlayerID, error
+// Also tracks played words in a set to prevent duplicates
+var submitWordScript = `
+local gameKey = KEYS[1]
+local expireSet = KEYS[2]
+local wordsKey = KEYS[3]
+local playerId = ARGV[1]
+local newWord = ARGV[2]
+local turnTimeout = ARGV[3]
+
+local status = redis.call('HGET', gameKey, 'status')
+if status ~= 'active' then
+    return {false, '', '', 'game_not_active'}
+end
+
+local currentTurnId = redis.call('HGET', gameKey, 'current_turn_id')
+if currentTurnId ~= playerId then
+    return {false, '', '', 'not_your_turn'}
+end
+
+-- Check if word has already been played
+if redis.call('SISMEMBER', wordsKey, newWord) == 1 then
+    return {false, '', '', 'word_already_played'}
+end
+
+-- Determine next turn player
+local player1Id = redis.call('HGET', gameKey, 'player1_id')
+local player2Id = redis.call('HGET', gameKey, 'player2_id')
+local nextTurnId = player1Id
+if playerId == player1Id then
+    nextTurnId = player2Id
+end
+
+-- Add word to played words set
+redis.call('SADD', wordsKey, newWord)
+
+-- Update game state
+redis.call('HSET', gameKey, 
+    'current_word', newWord,
+    'current_turn_id', nextTurnId
+)
+
+-- Reset turn timer
+local expireAt = redis.call('TIME')[1] + turnTimeout
+local gameId = string.gsub(gameKey, 'game:', '')
+redis.call('ZREM', expireSet, gameId)
+redis.call('ZADD', expireSet, expireAt, gameId)
+
+-- Publish update
+redis.call('PUBLISH', gameKey, 'word_submitted')
+
+return {true, newWord, nextTurnId, ''}
+`
+
+func (r *RedisClient) AtomicSubmitWord(gameID string, playerID string, newWord string) (bool, string, string, error) {
+	gameKey := gameKeyPrefix + gameID
+	wordsKey := gameKeyPrefix + gameID + ":words"
+	result, err := r.client.Eval(ctx, submitWordScript, []string{gameKey, gameExpireSet, wordsKey}, playerID, newWord, turnTimeoutSeconds).Result()
+	if err != nil {
+		return false, "", "", err
+	}
+
+	arr, ok := result.([]interface{})
+	if !ok || len(arr) != 4 {
+		return false, "", "", nil
+	}
+
+	success := false
+	if s, ok := arr[0].(int64); ok {
+		success = s == 1
+	}
+	word, _ := arr[1].(string)
+	nextTurnID, _ := arr[2].(string)
+	errMsg, _ := arr[3].(string)
+
+	if errMsg != "" {
+		return false, "", "", &AtomicOperationError{Message: errMsg}
+	}
+
+	return success, word, nextTurnID, nil
+}
+
+// GetPlayedWords retrieves all words that have been played in a game
+func (r *RedisClient) GetPlayedWords(gameID string) ([]string, error) {
+	wordsKey := gameKeyPrefix + gameID + ":words"
+	return r.client.SMembers(ctx, wordsKey).Result()
+}
+
+// IsWordPlayed checks if a specific word has already been played in a game
+func (r *RedisClient) IsWordPlayed(gameID string, word string) (bool, error) {
+	wordsKey := gameKeyPrefix + gameID + ":words"
+	return r.client.SIsMember(ctx, wordsKey, word).Result()
 }

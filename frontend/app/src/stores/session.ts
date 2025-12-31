@@ -1,6 +1,7 @@
 import axios from "axios";
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { useSocketStore } from "./socket";
 
 export const useSessionStore = defineStore("session", () => {
     const email = ref('');
@@ -38,6 +39,10 @@ export const useSessionStore = defineStore("session", () => {
         if (fresh.value) {
             await syncUserProfile()
             fresh.value = false
+            // Connect socket if already authenticated (e.g., page refresh with valid session)
+            if (authenticated.value) {
+                useSocketStore().connectSocket();
+            }
         }
         return authenticated.value
     }
@@ -45,14 +50,17 @@ export const useSessionStore = defineStore("session", () => {
     const registerUser = async (input: { email: string, name: string, password: string }) => {
         await axios.post('/api/auth/register', input);
         await syncUserProfile();
+        useSocketStore().connectSocket();
     }
 
     const loginUser = async (input: { email: string, password: string }) => {
         await axios.post('/api/auth/login', input);
         await syncUserProfile();
+        useSocketStore().connectSocket();
     }
 
     const logoutUser = async () => {
+        useSocketStore().closeSocket();
         await axios.post('/api/auth/logout');
         $reset();
     }

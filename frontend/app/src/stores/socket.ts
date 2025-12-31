@@ -13,7 +13,7 @@ export const useSocketStore = defineStore("socket", () => {
         if (socket.value) {
             return
         }
-        socket.value = new WebSocket('ws://localhost/ws')
+        socket.value = new WebSocket('wss://localhost/ws')
         socket.value.onmessage = onSocketMessage
     }
 

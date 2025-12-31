@@ -36,6 +36,8 @@ func getSessionFromStore(rdb *redis.Client, session_id string) (string, error) {
 	}
 
 	userId := sessionData["id"].(string)
+	userName := sessionData["name"].(string)
+	log.Println("getSessionFromStore() userId:", userId, "userName:", userName)
 
 	return userId, nil
 }
@@ -51,8 +53,6 @@ func authenticateRequest(rdb *redis.Client, req *http.Request) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
-	log.Println("session_data:", userId)
 
 	return userId, nil
 }

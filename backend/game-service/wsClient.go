@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 	"time"
@@ -32,7 +33,7 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
 		origin := r.Header.Get("Origin")
-		return origin == "http://localhost"
+		return origin == "https://localhost"
 	},
 }
 
@@ -67,11 +68,18 @@ func (c *Client) readPump() {
 			break
 		}
 
-		// TODO Handle incoming message
-		// Could be a game action that needs to be validated and published to Redis
+		// Parse the incoming message as a ClientAction
+		var action ClientAction
+		if err := json.Unmarshal(message, &action); err != nil {
+			log.Printf("Error parsing message from client %s: %v", c.UserID, err)
+			continue
+		}
 
-		// Also we might need to handle changing which game this client is in
-		// And joining a game
+		// Send action to hub for processing
+		c.Hub.actions <- &ClientActionRequest{
+			Client: c,
+			Action: &action,
+		}
 	}
 }
 
@@ -125,7 +133,7 @@ func ServeWs(hub *Hub, userID string, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Println("Websocket connected")
+	log.Println("Websocket connected for userid:", userID)
 
 	client := &Client{
 		Hub:    hub,
@@ -134,6 +142,9 @@ func ServeWs(hub *Hub, userID string, w http.ResponseWriter, r *http.Request) {
 		UserID: userID,
 		GameID: "",
 	}
+
+	// Register client with the hub
+	hub.register <- client
 
 	// Allow collection of memory referenced by the caller by doing all work in new goroutines.
 	go client.writePump()

@@ -2,6 +2,10 @@ FROM golang:1.25.4
 
 WORKDIR /app
 
+# Copy shared modules first
+COPY shared/ ./shared/
+
+# Copy game-service
 COPY game-service/go.mod game-service/go.sum ./game-service/
 
 WORKDIR /app/game-service
@@ -10,6 +14,9 @@ WORKDIR /app/game-service
 RUN go mod download
 
 COPY game-service/ .
+
+# Copy wordmap asset
+COPY shared/assets/4-WordMap.json /app/assets/4-WordMap.json
 
 # Build the server
 RUN go build -o /game-service

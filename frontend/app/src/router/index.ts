@@ -1,5 +1,6 @@
 import Landing from '@/views/landing/Landing.vue'
 import Home from '@/views/home/Home.vue'
+import Playview from '@/views/play/Play.vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import { createAuthGuard } from './guards'
 
@@ -13,6 +14,15 @@ const router = createRouter({
     {
       path: '/home',
       component: Home,
+    },
+    {
+      path: '/play',
+      children: [
+        {
+          path: '',
+          component: Playview,
+        }
+      ]
     },
   ],
 })

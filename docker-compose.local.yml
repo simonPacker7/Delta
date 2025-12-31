@@ -64,6 +64,18 @@ services:
       - db
       - redis
 
+  game-service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.game-service.local
+    container_name: delta_game_service
+    environment:
+      - API_PORT=8080
+      - REDIS_URL=redis:6379
+      - WORD_MAP_PATH=/app/assets/4-WordMap.json
+    depends_on:
+      - redis
+
   gateway:
     image: nginx:alpine
     container_name: delta_gateway

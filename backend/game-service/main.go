@@ -6,6 +6,8 @@ import (
 	"os"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/simonPacker7/Delta/backend/game-service/word"
+	"github.com/simonPacker7/Delta/backend/shared/redisclient"
 )
 
 func main() {
@@ -16,6 +18,10 @@ func main() {
 	}
 	redisURL := os.Getenv("REDIS_URL")
 	redisPassword := os.Getenv("REDIS_PASSWORD")
+	wordMapPath := os.Getenv("WORD_MAP_PATH")
+	if wordMapPath == "" {
+		wordMapPath = "/app/assets/4-WordMap.json"
+	}
 
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     redisURL,
@@ -23,7 +29,17 @@ func main() {
 		DB:       0, // use default DB
 	})
 
-	hub := createHub(rdb)
+	// Initialize redis client wrapper for game operations
+	redisClient := redisclient.NewRedisClient(redisclient.RedisConfig{
+		Addr:     redisURL,
+		Password: redisPassword,
+		DB:       0,
+	})
+
+	// Initialize word service
+	wordService := word.NewService(wordMapPath)
+
+	hub := createHub(rdb, redisClient, wordService)
 	go hub.Run()
 
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
