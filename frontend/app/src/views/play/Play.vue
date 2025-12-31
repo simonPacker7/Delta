@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import router from '@/router';
 import { useGameStore } from '@/stores/game'
+import joinWithCodeModal from "@/components/game/JoinWithCodeModal.vue"
 
 const gameStore = useGameStore()
 
@@ -13,8 +14,8 @@ const findGame = async () => {
 }
 
 const createPrivateGame = async () => {
-    // await gameStore.CreatePrivateGame()
-    // await router.push("/play/online")
+    await gameStore.CreatePrivateGame()
+    await router.push("/play/online")
 }
 
 const joinPrivateGame = async () => {
@@ -49,6 +50,9 @@ const localGame = async () => {
                 <button class="btn btn-outline-primary" :onclick="() => showJoinPrivateGameModal = true">
                     Join with code
                 </button>
+                <joinWithCodeModal :show-modal="showJoinPrivateGameModal"
+                    :join-game-func="(code: string) => gameStore.JoinPrivateGame(code)"
+                    @cancel="() => showJoinPrivateGameModal = false" @joined-game="joinPrivateGame" />
             </div>
         </div>
         <div>
