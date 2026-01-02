@@ -34,6 +34,8 @@ type Game struct {
 	Player2Name    string     `json:"player2Name" redis:"player2_name"`
 	CurrentWord    string     `json:"currentWord" redis:"current_word"`
 	CurrentTurnID  string     `json:"currentTurnId" redis:"current_turn_id"`
+	WinnerID       string     `json:"winnerId" redis:"winner_id"`
+	WinReason      string     `json:"winReason" redis:"win_reason"`
 	ConnectedCount int        `json:"connectedCount" redis:"connected_count"`
 	CreatedAt      int64      `json:"createdAt" redis:"created_at"`
 }

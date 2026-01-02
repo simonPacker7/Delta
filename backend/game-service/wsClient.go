@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -28,7 +29,10 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
 		origin := r.Header.Get("Origin")
-		return origin == "https://localhost"
+		// Allow localhost and local network IPs for development
+		return origin == "https://localhost" ||
+			strings.HasPrefix(origin, "https://192.168.") ||
+			strings.HasPrefix(origin, "https://10.")
 	},
 }
 

@@ -13,7 +13,8 @@ export const useSocketStore = defineStore("socket", () => {
         if (socket.value) {
             return
         }
-        socket.value = new WebSocket('wss://localhost/ws')
+        const wsUrl = `wss://${window.location.host}/ws`
+        socket.value = new WebSocket(wsUrl)
         socket.value.onmessage = onSocketMessage
     }
 

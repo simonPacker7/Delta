@@ -323,7 +323,7 @@ for i, gameId in ipairs(expired) do
         redis.call('HSET', gameKey, 
             'status', 'completed',
             'winner_id', winnerId,
-            'end_reason', 'timeout'
+            'win_reason', 'timeout'
         )
         
         -- Remove from expire set
@@ -420,7 +420,7 @@ func (r *RedisClient) EndGameByTimeout(gameID string, winnerID string) error {
 	return r.client.HSet(ctx, gameKeyPrefix+gameID,
 		"status", string(entities.GameStatusEnded),
 		"winner_id", winnerID,
-		"end_reason", "timeout",
+		"win_reason", "timeout",
 	).Err()
 }
 
