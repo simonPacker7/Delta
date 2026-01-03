@@ -30,9 +30,9 @@ func main() {
 	dbUsername := os.Getenv("DATABASE_USERNAME")
 	dbPassword := os.Getenv("DATABASE_PASSWORD")
 
-	wordMapPath := os.Getenv("WORD_MAP_PATH")
-	if wordMapPath == "" {
-		wordMapPath = "/app/assets/4-WordMap.json"
+	startWordsPath := os.Getenv("START_WORDS_PATH")
+	if startWordsPath == "" {
+		startWordsPath = "/app/assets/4-StartWords.json"
 	}
 
 	var redisConfig = redisclient.RedisConfig{
@@ -61,7 +61,7 @@ func main() {
 	auth := authService.NewService(pClient)
 	session := sessionService.NewService(rClient, &redisConfig)
 	users := userService.NewService(pClient)
-	words := wordService.NewService(wordMapPath)
+	words := wordService.NewService(startWordsPath)
 	game := gameService.NewService(rClient, words)
 
 	// Create endpoints

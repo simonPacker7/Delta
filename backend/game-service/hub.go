@@ -238,6 +238,18 @@ func (h *Hub) handleSubmitWord(client *Client, gameID string, word string) {
 		return
 	}
 
+	// Check if word has already been played (before validating move)
+	alreadyPlayed, err := h.redisClient.IsWordPlayed(gameID, word)
+	if err != nil {
+		log.Printf("Error checking if word played: %v", err)
+		h.sendErrorToClient(client, "submit_failed", "server_error")
+		return
+	}
+	if alreadyPlayed {
+		h.sendErrorToClient(client, "submit_failed", "word_already_played")
+		return
+	}
+
 	// Validate the word is a valid move using word service
 	if !h.wordService.IsValidMove(game.CurrentWord, word) {
 		h.sendErrorToClient(client, "submit_failed", "invalid_move")

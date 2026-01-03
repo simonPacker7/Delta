@@ -8,10 +8,52 @@
             "command": "docker compose -f docker-compose.local.yml up -d --build"
         },
         {
+            "label": "stop all services",
+            "type": "shell",
+            "problemMatcher": [],
+            "command": "docker compose -f docker-compose.local.yml down"
+        },
+        {
             "label": "migrate db",
             "type": "shell",
             "problemMatcher": [],
             "command": "docker compose -f docker-compose.local.yml run --rm migration update"
         },
+        {
+            "label": "up worker",
+            "type": "shell",
+            "problemMatcher": [],
+            "command": "docker compose -f docker-compose.local.yml up --build worker"
+        },
+        {
+            "label": "up game-service",
+            "type": "shell",
+            "problemMatcher": [],
+            "command": "docker compose -f docker-compose.local.yml up --build game-service"
+        },
+        {
+            "label": "up frontend",
+            "type": "shell",
+            "problemMatcher": [],
+            "command": "docker compose -f docker-compose.local.yml up --build frontend"
+        },
+        {
+            "label": "up postgres",
+            "type": "shell",
+            "problemMatcher": [],
+            "command": "docker compose -f docker-compose.local.yml up --build postgres"
+        },
+        {
+            "label": "up redis",
+            "type": "shell",
+            "problemMatcher": [],
+            "command": "docker compose -f docker-compose.local.yml up --build redis"
+        },
+        {
+            "label": "up gateway",
+            "type": "shell",
+            "problemMatcher": [],
+            "command": "docker compose -f docker-compose.local.yml up --build gateway"
+        }
     ]
 }

@@ -45,6 +45,7 @@ services:
   redis:
     image: redis:8-alpine
     container_name: delta_redis
+    restart: on-failure
     ports:
       - "6379:6379"
 
@@ -60,7 +61,7 @@ services:
       - DATABASE_USERNAME=delta
       - DATABASE_PASSWORD=password123
       - REDIS_URL=redis:6379
-      - WORD_MAP_PATH=/app/assets/4-WordMap.json
+      - START_WORDS_PATH=/app/assets/4-StartWords.json
     depends_on:
       - db
       - redis

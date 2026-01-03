@@ -8,44 +8,38 @@ import (
 )
 
 type Service struct {
-	wordKeys []string
+	startWords []string
 }
 
-func NewService(wordMapPath string) *Service {
-	wordMap, err := loadWordMap(wordMapPath)
+func NewService(startWordsPath string) *Service {
+	startWords, err := loadStartWords(startWordsPath)
 	if err != nil {
-		log.Fatalf("Failed to load word map: %v", err)
+		log.Fatalf("Failed to load start words: %v", err)
 	}
 
-	// Pre-compute keys for random selection (we only need the keys, not the values)
-	keys := make([]string, 0, len(wordMap))
-	for k := range wordMap {
-		keys = append(keys, k)
-	}
-
-	log.Printf("Loaded %d words for start word selection", len(keys))
+	log.Printf("Loaded %d start words", len(startWords))
 
 	return &Service{
-		wordKeys: keys,
+		startWords: startWords,
 	}
 }
 
-func loadWordMap(path string) (map[string][]string, error) {
+func loadStartWords(path string) ([]string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
 
-	var wordMap map[string][]string
-	err = json.Unmarshal(data, &wordMap)
+	var startWords []string
+	err = json.Unmarshal(data, &startWords)
 	if err != nil {
 		return nil, err
 	}
 
-	return wordMap, nil
+	return startWords, nil
 }
 
-// GetRandomStartWord returns a random word from the wordmap
+// GetRandomStartWord returns a random start word
 func (s *Service) GetRandomStartWord() string {
-	return s.wordKeys[rand.Intn(len(s.wordKeys))]
+	return s.startWords[rand.Intn(len(s.startWords))]
 }

@@ -20,20 +20,20 @@ func NewService(p *postgresclient.PostgresClient) *Service {
 func (s *Service) RegisterUser(input entities.RegisterUserInput) (string, error) {
 	userExists, err := s.postgresService.DoesUserExist(input.Email)
 	if err != nil {
-		return "", err
+		return "", errors.New("A user with that email already exists")
 	}
 	if userExists {
-		return "", errors.New("user with that email already exists")
+		return "", errors.New("A user with that email already exists")
 	}
 
 	err = hashPassword(&input.Password)
 	if err != nil {
-		return "", err
+		return "", errors.New("Error registering user, please try again")
 	}
 
 	userId, err := s.postgresService.CreateUser(input)
 	if err != nil {
-		return "", err
+		return "", errors.New("Error registering user, please try again")
 	}
 
 	return userId, nil
@@ -42,23 +42,23 @@ func (s *Service) RegisterUser(input entities.RegisterUserInput) (string, error)
 func (s *Service) LoginUser(input entities.LoginUserInput) (entities.UserProfile, error) {
 	userExists, err := s.postgresService.DoesUserExist(input.Email)
 	if err != nil {
-		return entities.UserProfile{}, err
+		return entities.UserProfile{}, errors.New("Invalid email or password")
 	}
 	if !userExists {
-		return entities.UserProfile{}, errors.New("user with that email does not exist")
+		return entities.UserProfile{}, errors.New("Invalid email or password")
 	}
 
 	userPassword, err := s.postgresService.GetUserPassword(input.Email)
 	if err != nil {
-		return entities.UserProfile{}, err
+		return entities.UserProfile{}, errors.New("Invalid email or password")
 	}
 
 	isMatch, err := doPasswordsMatch(userPassword, input.Password)
 	if err != nil {
-		return entities.UserProfile{}, err
+		return entities.UserProfile{}, errors.New("Invalid email or password")
 	}
 	if !isMatch {
-		return entities.UserProfile{}, errors.New("password does not match")
+		return entities.UserProfile{}, errors.New("Invalid email or password")
 	}
 
 	return s.postgresService.GetUserProfile(input.Email)
