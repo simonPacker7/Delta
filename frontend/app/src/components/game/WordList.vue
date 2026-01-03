@@ -1,50 +1,68 @@
 <script setup lang="ts">
-import { ref, onUnmounted } from 'vue'
+import { ref, onUnmounted, computed, watch, nextTick } from 'vue'
 import type { GameTurn } from '@/stores/game'
-import wordItem from "./WordItem.vue"
+import WordItem from "./WordItem.vue"
 
-const props = defineProps({
-    gameMoves: { type: Array<GameTurn> },
-    isGameActive: { type: Boolean },
-})
+const props = defineProps<{
+    gameMoves?: GameTurn[]
+    isGameActive: boolean
+    currentPlayerId?: string | null
+}>()
 
 const emit = defineEmits(['timeExpired'])
 
-const secondsLeft = ref(0);
-let secondsLeftInterval: number | null = null;
+const secondsLeft = ref(0)
+const TURN_TIME_LIMIT = 99
+let secondsLeftInterval: number | null = null
+const scrollContainerRef = ref<HTMLElement | null>(null)
 
 const clearSecondsInterval = () => {
     if (secondsLeftInterval != null) {
         clearInterval(secondsLeftInterval)
+        secondsLeftInterval = null
     }
 }
 
 const restartSecondsInterval = () => {
     clearSecondsInterval()
-
-    secondsLeft.value = 99
+    secondsLeft.value = TURN_TIME_LIMIT
     secondsLeftInterval = setInterval(() => {
         if (secondsLeft.value > 0) {
-            secondsLeft.value--;
+            secondsLeft.value--
         } else {
             clearSecondsInterval()
             emit("timeExpired")
         }
-    }, 1000);
+    }, 1000)
 }
 
-const scrollListBottom = (el: any) => {
-    el.scrollIntoView({ behavior: 'smooth' })
+const scrollToBottom = () => {
+    nextTick(() => {
+        if (scrollContainerRef.value) {
+            scrollContainerRef.value.scrollTo({
+                top: scrollContainerRef.value.scrollHeight,
+                behavior: 'smooth'
+            })
+        }
+    })
 }
 
-const onNewItem = (el: any) => {
-    if (props.isGameActive) {
-        restartSecondsInterval()
-    } else {
+// Watch for new words and scroll to bottom
+watch(() => props.gameMoves?.length, (newLength, oldLength) => {
+    if (newLength && (!oldLength || newLength > oldLength)) {
+        if (props.isGameActive) {
+            restartSecondsInterval()
+        }
+        scrollToBottom()
+    }
+})
+
+// Also handle game becoming inactive
+watch(() => props.isGameActive, (active) => {
+    if (!active) {
         clearSecondsInterval()
     }
-    scrollListBottom(el)
-}
+})
 
 const isNewWord = (index: number) => {
     return props.gameMoves != null
@@ -52,111 +70,251 @@ const isNewWord = (index: number) => {
         && props.isGameActive
 }
 
+const isCurrentPlayerMove = (playerId: string) => {
+    return playerId === props.currentPlayerId
+}
+
+const timerPercentage = computed(() => {
+    return (secondsLeft.value / TURN_TIME_LIMIT) * 100
+})
+
+const timerColor = computed(() => {
+    if (secondsLeft.value > 30) return '#22c55e'
+    if (secondsLeft.value > 10) return '#eab308'
+    return '#ef4444'
+})
+
 onUnmounted(() => {
     clearSecondsInterval()
 })
 </script>
 
 <template>
-    <div class="word-container">
-        <transition-group name="fade" tag="ul" @enter="onNewItem" class="list-group list-group-flush">
-            <transition-group tag="li" v-for="{ Player, Word }, index in gameMoves" :key="index"
-                class="list-group-item d-flex align-items-center justify-content-center"
-                :class="{ 'new-word-animation': isNewWord(index) }">
-                <span class="wordBadge badge text-bg-secondary mono" :key="index">{{ Player.Name }}</span>
-                <wordItem :key="index" :word="Word" />
-                <span class="secondsRemaining mono" :key="index" v-if="isNewWord(index)">{{ secondsLeft
-                }}s</span>
-            </transition-group>
-        </transition-group>
+    <div class="word-list-container">
+        <!-- Timer Bar (only visible during active game) -->
+        <div v-if="isGameActive && gameMoves && gameMoves.length > 0" class="timer-bar">
+            <div class="timer-track">
+                <div 
+                    class="timer-fill"
+                    :style="{ 
+                        width: timerPercentage + '%',
+                        backgroundColor: timerColor
+                    }"
+                ></div>
+            </div>
+            <span class="timer-text" :style="{ color: timerColor }">
+                {{ secondsLeft }}s
+            </span>
+        </div>
+
+        <!-- Words List -->
+        <div ref="scrollContainerRef" class="words-scroll">
+            <TransitionGroup name="word" tag="div" class="words-list">
+                <div
+                    v-for="({ Player, Word }, index) in gameMoves"
+                    :key="index"
+                    class="word-row"
+                    :class="{ 
+                        'is-new': isNewWord(index),
+                        'is-current-player': isCurrentPlayerMove(Player.ID)
+                    }"
+                >
+                    <!-- Player indicator -->
+                    <div class="player-indicator" :class="{ 'self': isCurrentPlayerMove(Player.ID) }">
+                        <span class="player-label">{{ Player.Name }}</span>
+                    </div>
+
+                    <!-- Word display -->
+                    <WordItem :word="Word" :highlight="isNewWord(index)" />
+                </div>
+            </TransitionGroup>
+
+            <!-- Empty state -->
+            <div v-if="!gameMoves || gameMoves.length === 0" class="empty-state">
+                <span class="empty-text">Waiting for first word...</span>
+            </div>
+        </div>
     </div>
 </template>
 
 <style scoped>
-.word-container {
+.word-list-container {
     display: flex;
-    flex-direction: column-reverse;
-    width: 20vw;
-    min-width: 480px;
-    height: 50vh;
-    margin-bottom: 50px;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 1rem;
+    overflow: hidden;
 }
 
-.list-group {
-    max-height: 50vh;
-    overflow: auto;
-    scroll-behavior: smooth;
+/* Timer Bar */
+.timer-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.list-group-item {
-    position: relative;
+.timer-track {
+    flex: 1;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    overflow: hidden;
 }
 
-.wordBadge {
-    position: absolute;
-    left: 5%;
+.timer-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 1s linear, background-color 0.3s ease;
 }
 
-.secondsRemaining {
-    position: absolute;
-    left: 90%;
+.timer-text {
+    font-family: monospace;
+    font-size: 0.875rem;
+    font-weight: 600;
+    min-width: 3rem;
+    text-align: right;
 }
 
-/* Fade-in effect */
-.fade-enter-active,
-.fade-leave-active {
-    transition: opacity 1s ease;
+/* Words scroll area */
+.words-scroll {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0.5rem;
+    display: flex;
+    flex-direction: column;
 }
 
-.fade-enter-from,
-.fade-leave-to {
+/* Hide scrollbar but keep functionality */
+.words-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+
+.words-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.words-scroll::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+}
+
+.words-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* Words list */
+.words-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: auto;
+}
+
+/* Word row */
+.word-row {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.75rem;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 0.75rem;
+    transition: all 0.3s ease;
+}
+
+.word-row.is-new {
+    background: rgba(34, 197, 94, 0.08);
+    border-color: rgba(34, 197, 94, 0.2);
+}
+
+.word-row.is-current-player {
+    background: rgba(99, 102, 241, 0.08);
+    border-color: rgba(99, 102, 241, 0.15);
+}
+
+.word-row.is-current-player.is-new {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(34, 197, 94, 0.1) 100%);
+    border-color: rgba(34, 197, 94, 0.25);
+}
+
+/* Player indicator */
+.player-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.player-label {
+    font-family: monospace;
+    font-size: 0.7rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6b7280;
+}
+
+.player-indicator.self .player-label {
+    color: #a5b4fc;
+}
+
+/* Empty state */
+.empty-state {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+}
+
+.empty-text {
+    font-family: monospace;
+    font-size: 0.9rem;
+    color: #4b5563;
+}
+
+/* Word transition animations */
+.word-enter-active {
+    transition: all 0.4s ease;
+}
+
+.word-leave-active {
+    transition: all 0.2s ease;
+}
+
+.word-enter-from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+}
+
+.word-leave-to {
     opacity: 0;
 }
 
-/* Hide scrollbar for Chrome, Safari and Opera */
-.list-group::-webkit-scrollbar {
-    display: none;
-}
-
-/* Hide scrollbar for IE, Edge and Firefox */
-.list-group {
-    -ms-overflow-style: none;
-    /* IE and Edge */
-    scrollbar-width: none;
-    /* Firefox */
-}
-
-/* Different color for the last item */
-.new-word-animation::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    background-color: #ae9292;
-    transform-origin: right;
-    z-index: 0;
-    animation: colorFade 100s linear, scaleXAnimation 100s linear;
-}
-
-@keyframes colorFade {
-    0% {
-        background-color: #ae9292;
+/* Responsive */
+@media (max-width: 480px) {
+    .timer-bar {
+        padding: 0.625rem 0.75rem;
     }
 
-    100% {
-        background-color: #953636;
-    }
-}
-
-@keyframes scaleXAnimation {
-    0% {
-        transform: scaleX(1);
+    .timer-text {
+        font-size: 0.8rem;
+        min-width: 2.5rem;
     }
 
-    100% {
-        transform: scaleX(0);
+    .word-row {
+        padding: 0.625rem;
+    }
+
+    .player-label {
+        font-size: 0.65rem;
     }
 }
 </style>

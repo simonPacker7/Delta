@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { XMarkIcon } from '@heroicons/vue/24/outline'
+
 const props = defineProps({
     id: String,
     title: String,
@@ -9,92 +11,170 @@ const props = defineProps({
     },
 })
 
+const emit = defineEmits(['close'])
 </script>
 
 <template>
-    <div>
-        <section :id="props.id" ref="modalRef" class="modal" :class="{ 'modal-active': active }" role="dialog">
-            <div class="modal-content modal-dialog">
-                <slot name="header">
-                    <header class="modal-header center">
-                        <h2 class="modal-title">
-                            {{ props.title }}
-                        </h2>
-                        <button v-if="showCloseBtn" type="button" class="close close-btn" data-dismiss="modal"
-                            aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
-                    </header>
-                </slot>
-                <slot name="body">
-                    <div class="modal-body">
-                        <slot name="content">
+    <Teleport to="body">
+        <Transition name="modal">
+            <div v-if="active" :id="props.id" class="modal-overlay" role="dialog" aria-modal="true">
+                <div class="modal-backdrop" @click="emit('close')"></div>
+                <div class="modal-container">
+                    <div class="modal-content">
+                        <slot name="header">
+                            <header class="modal-header">
+                                <h2 class="modal-title">{{ props.title }}</h2>
+                                <button 
+                                    v-if="showCloseBtn" 
+                                    type="button" 
+                                    class="close-btn" 
+                                    @click="emit('close')"
+                                    aria-label="Close"
+                                >
+                                    <XMarkIcon class="close-icon" />
+                                </button>
+                            </header>
+                        </slot>
+                        <slot name="body">
+                            <div class="modal-body">
+                                <slot name="content"></slot>
+                            </div>
+                        </slot>
+                        <slot name="footer">
+                            <div class="modal-footer">
+                                <slot name="footerContent"></slot>
+                            </div>
                         </slot>
                     </div>
-                </slot>
-                <slot name="footer">
-                    <div class="modal-footer">
-                        <slot name="footerContent">
-                            <button class="btn btn-outline-primary">Exit</button>
-                        </slot>
-                    </div>
-                </slot>
+                </div>
             </div>
-        </section>
-    </div>
+        </Transition>
+    </Teleport>
 </template>
 
 <style scoped>
-.modal-active {
-    display: block !important;
-}
-
-.modal {
-    display: none;
-    /* Hidden by default */
+.modal-overlay {
     position: fixed;
-    z-index: 1;
+    z-index: 2000;
     left: 0;
     top: 0;
     width: 100%;
     height: 100%;
-    overflow: auto;
-    background-color: rgba(0, 0, 0, 0.4)
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+}
+
+.modal-container {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 420px;
 }
 
 .modal-content {
-    margin: 15% auto;
-    border: 1px solid #888;
-    width: 80%;
-}
-
-.close-btn {
-    border: 0px;
-}
-
-.modal-header,
-.modal-body,
-.modal-footer {
-    background-color: var(--vt-c-black-soft);
+    background: rgba(30, 30, 35, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 1.25rem;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
 }
 
 .modal-header {
-    border-bottom: 1px dashed beige;
-}
-
-.modal-footer {
-    border-top: 0px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .modal-title {
     font-family: monospace;
-    font-weight: 500;
-    color: beige;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #ffffff;
+    margin: 0;
 }
 
-.center {
+.close-btn {
     display: flex;
-    justify-content: center;
     align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.close-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.close-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+    color: #9ca3af;
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.modal-footer {
+    display: flex;
+    gap: 0.75rem;
+    padding: 1rem 1.5rem 1.5rem;
+}
+
+/* Transition */
+.modal-enter-active,
+.modal-leave-active {
+    transition: opacity 0.2s ease;
+}
+
+.modal-enter-active .modal-container,
+.modal-leave-active .modal-container {
+    transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.modal-enter-from,
+.modal-leave-to {
+    opacity: 0;
+}
+
+.modal-enter-from .modal-container,
+.modal-leave-to .modal-container {
+    transform: scale(0.95);
+    opacity: 0;
+}
+
+@media (max-width: 480px) {
+    .modal-container {
+        max-width: none;
+    }
+    
+    .modal-header {
+        padding: 1rem 1.25rem;
+    }
+    
+    .modal-body {
+        padding: 1.25rem;
+    }
+    
+    .modal-footer {
+        padding: 0.75rem 1.25rem 1.25rem;
+        flex-direction: column;
+    }
 }
 </style>

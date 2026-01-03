@@ -192,11 +192,15 @@ export const useGameStore = defineStore("game", () => {
         $reset();
     }
 
+    const clearError = () => {
+        error.value = null;
+    }
+
 
     return { 
         gameId, gameType, gameStatus, currentWord, currentTurnId, 
         player1, player2, gameTurns, winnerId, winReason, joinCode, error,
-        FindGame, CreatePrivateGame, JoinPrivateGame, SendWord, HandleGameUpdate, LeaveGame, $reset
+        FindGame, CreatePrivateGame, JoinPrivateGame, SendWord, HandleGameUpdate, LeaveGame, clearError, $reset
     }
 
 });

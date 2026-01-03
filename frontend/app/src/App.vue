@@ -1,24 +1,48 @@
 <script setup lang="ts">
 import HeaderView from "@/components/header/Header.vue"
-import { RouterView } from 'vue-router'
+import { RouterView, useRoute } from 'vue-router'
+import { computed } from 'vue'
+
+const route = useRoute()
+const isLandingPage = computed(() => route.path === '/')
 </script>
 
 <template>
-  <HeaderView />
-  <main>
+  <HeaderView v-if="!isLandingPage" />
+  <main :class="{ 'with-header': !isLandingPage }">
     <RouterView />
   </main>
 </template>
 
 <style scoped>
 main {
-  /* Adjust for header height (TODO: Adjust to actual height not this random amount) */
-  margin-top: 130px;
   width: 100%;
+  min-height: 100vh;
+}
+
+main.with-header {
+  /* Adjust for header height (70px desktop, 60px mobile) */
+  padding-top: 70px;
+}
+
+@media (max-width: 480px) {
+  main.with-header {
+    padding-top: 60px;
+  }
 }
 </style>
 
 <style>
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
 body {
   background-color: #282828;
   color: white;
