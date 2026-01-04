@@ -38,6 +38,8 @@ type Game struct {
 	WinReason      string     `json:"winReason" redis:"win_reason"`
 	ConnectedCount int        `json:"connectedCount" redis:"connected_count"`
 	CreatedAt      int64      `json:"createdAt" redis:"created_at"`
+	StartTime      int64      `json:"startTime" redis:"start_time"`
+	EndTime        int64      `json:"endTime" redis:"end_time"`
 }
 
 type FindGameResponse struct {

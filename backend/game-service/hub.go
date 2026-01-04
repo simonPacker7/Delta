@@ -13,7 +13,7 @@ import (
 
 // ClientAction represents an incoming message from a client
 type ClientAction struct {
-	Action string `json:"action"` // "join_game", "leave_game", "submit_word"
+	Action string `json:"action"` // "join_game", "leave_game", "submit_word", "forfeit"
 	GameID string `json:"gameId"`
 	Word   string `json:"word,omitempty"`
 }
@@ -124,6 +124,8 @@ func (h *Hub) handleAction(actionReq *ClientActionRequest) {
 		h.handleLeaveGame(client)
 	case "submit_word":
 		h.handleSubmitWord(client, action.GameID, action.Word)
+	case "forfeit":
+		h.handleForfeit(client, action.GameID)
 	default:
 		log.Printf("Unknown action: %s", action.Action)
 	}
@@ -218,6 +220,27 @@ func (h *Hub) handleLeaveGame(client *Client) {
 	h.leaveGameInternal(client)
 }
 
+func (h *Hub) handleForfeit(client *Client, gameID string) {
+	if client.GameID != gameID {
+		h.sendErrorToClient(client, "forfeit_failed", "not_in_game")
+		return
+	}
+
+	// Atomically forfeit the game
+	winnerID, err := h.redisClient.AtomicForfeitGame(gameID, client.UserID)
+	if err != nil {
+		log.Printf("Error forfeiting game: %v", err)
+		h.sendErrorToClient(client, "forfeit_failed", err.Error())
+		return
+	}
+
+	log.Printf("Client %s forfeited game %s, winner: %s", client.UserID, gameID, winnerID)
+
+	// The AtomicForfeitGame already publishes the game_ended event via Redis Pub/Sub,
+	// which will be picked up by ListenToRedis and broadcast to all clients.
+	// No need to broadcast here - it's handled by the Pub/Sub listener.
+}
+
 func (h *Hub) handleSubmitWord(client *Client, gameID string, word string) {
 	if client.GameID != gameID {
 		h.sendErrorToClient(client, "submit_failed", "not_in_game")
@@ -256,8 +279,14 @@ func (h *Hub) handleSubmitWord(client *Client, gameID string, word string) {
 		return
 	}
 
+	// Get the player name from game state
+	playerName := game.Player1Name
+	if client.UserID == game.Player2ID {
+		playerName = game.Player2Name
+	}
+
 	// Atomically submit the word (updates game state and resets timer)
-	success, newWord, nextTurnID, err := h.redisClient.AtomicSubmitWord(gameID, client.UserID, word)
+	success, newWord, nextTurnID, err := h.redisClient.AtomicSubmitWord(gameID, client.UserID, playerName, word)
 	if err != nil {
 		log.Printf("Error submitting word: %v", err)
 		// Check for specific error types
@@ -272,12 +301,6 @@ func (h *Hub) handleSubmitWord(client *Client, gameID string, word string) {
 	if !success {
 		h.sendErrorToClient(client, "submit_failed", "atomic_failed")
 		return
-	}
-
-	// Get the player name from game state
-	playerName := game.Player1Name
-	if client.UserID == game.Player2ID {
-		playerName = game.Player2Name
 	}
 
 	log.Printf("Client %s submitted word '%s' for game %s, next turn: %s", client.UserID, word, gameID, nextTurnID)
@@ -384,5 +407,30 @@ func (h *Hub) ListenToRedis() {
 
 		// Broadcast the raw message to all clients in this game
 		h.BroadcastToGame(gameID, []byte(msg.Payload))
+
+		// Check if this is a game_ended event and clean up the game
+		var gameMsg GameMessage
+		if err := json.Unmarshal([]byte(msg.Payload), &gameMsg); err == nil {
+			if gameMsg.Type == "game_ended" || gameMsg.Type == "game_ended_timeout" {
+				h.cleanupGame(gameID)
+			}
+		}
+	}
+}
+
+// cleanupGame removes all clients from a game and clears the game from the map
+// Called after a game ends to stop tracking clients for that game
+func (h *Hub) cleanupGame(gameID string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if gameClients, ok := h.games[gameID]; ok {
+		// Clear the GameID from each client so they're no longer associated
+		for client := range gameClients {
+			client.GameID = ""
+		}
+		// Remove the game from the games map
+		delete(h.games, gameID)
+		log.Printf("Cleaned up game %s after end", gameID)
 	}
 }

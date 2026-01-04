@@ -1,6 +1,7 @@
 package redisclient
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -145,6 +146,86 @@ func (r *RedisClient) AtomicCancelMatchmaking(gameID string, playerID string, jo
 	return nil
 }
 
+// AtomicForfeitGame atomically ends a game due to forfeit
+// Sets the opponent as winner and publishes game_ended event
+var forfeitGameScript = `
+local gameKey = KEYS[1]
+local expireSet = KEYS[2]
+local playerId = ARGV[1]
+local gameId = ARGV[2]
+
+-- Check game exists
+local status = redis.call('HGET', gameKey, 'status')
+if not status then
+    return {'', 'game_not_found'}
+end
+
+-- Only allow forfeiting active games
+if status ~= 'active' then
+    return {'', 'game_not_active'}
+end
+
+-- Verify player is in the game
+local player1Id = redis.call('HGET', gameKey, 'player1_id')
+local player2Id = redis.call('HGET', gameKey, 'player2_id')
+
+if playerId ~= player1Id and playerId ~= player2Id then
+    return {'', 'not_in_game'}
+end
+
+-- Determine winner (opponent of the forfeiting player)
+local winnerId = player1Id
+if playerId == player1Id then
+    winnerId = player2Id
+end
+
+-- End the game
+local timeResult = redis.call('TIME')
+local endTime = tonumber(timeResult[1])
+redis.call('HSET', gameKey,
+    'status', 'completed',
+    'winner_id', winnerId,
+    'win_reason', 'forfeit',
+    'end_time', endTime
+)
+
+-- Remove from expiration queue
+redis.call('ZREM', expireSet, gameId)
+
+-- Publish game ended event
+local jsonMsg = '{"type":"game_ended","gameId":"' .. gameId .. '","payload":{"winnerId":"' .. winnerId .. '","reason":"forfeit"}}'
+redis.call('PUBLISH', gameKey, jsonMsg)
+
+return {winnerId, ''}
+`
+
+func (r *RedisClient) AtomicForfeitGame(gameID string, playerID string) (string, error) {
+	gameKey := gameKeyPrefix + gameID
+
+	result, err := r.client.Eval(ctx, forfeitGameScript,
+		[]string{gameKey, gameExpireSet},
+		playerID, gameID,
+	).Result()
+
+	if err != nil {
+		return "", err
+	}
+
+	arr, ok := result.([]interface{})
+	if !ok || len(arr) < 2 {
+		return "", &AtomicOperationError{Message: "unexpected_result"}
+	}
+
+	winnerID, _ := arr[0].(string)
+	errMsg, _ := arr[1].(string)
+
+	if errMsg != "" {
+		return "", &AtomicOperationError{Message: errMsg}
+	}
+
+	return winnerID, nil
+}
+
 // PublishGameEvent publishes an event to the game's pub/sub channel
 func (r *RedisClient) PublishGameEvent(gameID string, event string) error {
 	channel := gameKeyPrefix + gameID
@@ -208,6 +289,12 @@ redis.call('HSET', gameKey,
 -- Initialize played words set with starting word
 redis.call('SADD', wordsKey, startWord)
 redis.call('EXPIRE', wordsKey, 86400)
+
+-- Initialize moves list with starting word (no player for initial word)
+local movesKey = gameKey .. ':moves'
+local startMove = cjson.encode({playerId = '0', playerName = 'start', word = startWord, timestamp = redis.call('TIME')[1]})
+redis.call('RPUSH', movesKey, startMove)
+redis.call('EXPIRE', movesKey, 86400)
 
 redis.call('DEL', codeKey)
 
@@ -279,6 +366,12 @@ for i = 1, maxAttempts do
         -- Initialize played words set with starting word
         redis.call('SADD', wordsKey, startWord)
         redis.call('EXPIRE', wordsKey, 86400)
+        
+        -- Initialize moves list with starting word (no player for initial word)
+        local movesKey = gameKey .. ':moves'
+        local startMove = cjson.encode({playerId = '0', playerName = 'start', word = startWord, timestamp = redis.call('TIME')[1]})
+        redis.call('RPUSH', movesKey, startMove)
+        redis.call('EXPIRE', movesKey, 86400)
         
         return {gameId, player1Id, true}
     end
@@ -388,10 +481,13 @@ for i, gameId in ipairs(expired) do
         end
         
         -- Atomically end the game
+        local timeResult = redis.call('TIME')
+        local endTime = tonumber(timeResult[1])
         redis.call('HSET', gameKey, 
             'status', 'completed',
             'winner_id', winnerId,
-            'win_reason', 'timeout'
+            'win_reason', 'timeout',
+            'end_time', endTime
         )
         
         -- Remove from expire set
@@ -515,11 +611,12 @@ local newCount = redis.call('HINCRBY', gameKey, 'connected_count', 1)
 -- 1. Both players are connected (count == 2)
 -- 2. Status is 'ready' (both players have been matched via matchmaking)
 if newCount == 2 and status == 'ready' then
-    redis.call('HSET', gameKey, 'status', 'active')
+    local timeResult = redis.call('TIME')
+    local now = tonumber(timeResult[1])
+    redis.call('HSET', gameKey, 'status', 'active', 'start_time', now)
     
     -- Add to expiration queue
-    local timeResult = redis.call('TIME')
-    local expireAt = tonumber(timeResult[1]) + tonumber(turnTimeout)
+    local expireAt = now + tonumber(turnTimeout)
     local gameId = string.gsub(gameKey, 'game:', '')
     redis.call('ZADD', expireSet, expireAt, gameId)
     
@@ -568,9 +665,11 @@ var submitWordScript = `
 local gameKey = KEYS[1]
 local expireSet = KEYS[2]
 local wordsKey = KEYS[3]
+local movesKey = KEYS[4]
 local playerId = ARGV[1]
 local newWord = ARGV[2]
 local turnTimeout = ARGV[3]
+local playerName = ARGV[4]
 
 local status = redis.call('HGET', gameKey, 'status')
 if status ~= 'active' then
@@ -598,6 +697,11 @@ end
 -- Add word to played words set
 redis.call('SADD', wordsKey, newWord)
 
+-- Add move to moves list with player info and timestamp
+local timestamp = redis.call('TIME')[1]
+local move = cjson.encode({playerId = playerId, playerName = playerName, word = newWord, timestamp = timestamp})
+redis.call('RPUSH', movesKey, move)
+
 -- Update game state
 redis.call('HSET', gameKey, 
     'current_word', newWord,
@@ -614,10 +718,11 @@ redis.call('ZADD', expireSet, expireAt, gameId)
 return {true, newWord, nextTurnId, ''}
 `
 
-func (r *RedisClient) AtomicSubmitWord(gameID string, playerID string, newWord string) (bool, string, string, error) {
+func (r *RedisClient) AtomicSubmitWord(gameID string, playerID string, playerName string, newWord string) (bool, string, string, error) {
 	gameKey := gameKeyPrefix + gameID
 	wordsKey := gameKeyPrefix + gameID + ":words"
-	result, err := r.client.Eval(ctx, submitWordScript, []string{gameKey, gameExpireSet, wordsKey}, playerID, newWord, turnTimeoutSeconds).Result()
+	movesKey := gameKeyPrefix + gameID + ":moves"
+	result, err := r.client.Eval(ctx, submitWordScript, []string{gameKey, gameExpireSet, wordsKey, movesKey}, playerID, newWord, turnTimeoutSeconds, playerName).Result()
 	if err != nil {
 		return false, "", "", err
 	}
@@ -652,4 +757,33 @@ func (r *RedisClient) GetPlayedWords(gameID string) ([]string, error) {
 func (r *RedisClient) IsWordPlayed(gameID string, word string) (bool, error) {
 	wordsKey := gameKeyPrefix + gameID + ":words"
 	return r.client.SIsMember(ctx, wordsKey, word).Result()
+}
+
+// MoveRecord represents a single move in the game history
+type MoveRecord struct {
+	PlayerID   string `json:"playerId"`
+	PlayerName string `json:"playerName"`
+	Word       string `json:"word"`
+	Timestamp  int64  `json:"timestamp"`
+}
+
+// GetMoves retrieves the ordered list of moves for a game
+// Used when persisting game history to Postgres
+func (r *RedisClient) GetMoves(gameID string) ([]MoveRecord, error) {
+	movesKey := gameKeyPrefix + gameID + ":moves"
+	moveStrings, err := r.client.LRange(ctx, movesKey, 0, -1).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	moves := make([]MoveRecord, 0, len(moveStrings))
+	for _, moveStr := range moveStrings {
+		var move MoveRecord
+		if err := json.Unmarshal([]byte(moveStr), &move); err != nil {
+			continue // Skip malformed entries
+		}
+		moves = append(moves, move)
+	}
+
+	return moves, nil
 }

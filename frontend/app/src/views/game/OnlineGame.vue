@@ -1,18 +1,25 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useGameStore } from '@/stores/game'
 import { useSessionStore } from '@/stores/session'
-import { useRouter } from 'vue-router'
+import { useRouter, onBeforeRouteLeave } from 'vue-router'
 
 import InputBar from '@/components/game/InputBar.vue'
 import WordList from '@/components/game/WordList.vue'
 import GameOverModal from '@/components/game/GameOverModal.vue'
 import GameLoadingModal from "@/components/game/GameLoadingModal.vue"
 import GameHeader from '@/components/game/GameHeader.vue'
+import ForfeitConfirmModal from '@/components/game/ForfeitConfirmModal.vue'
 
 const gameStore = useGameStore()
 const sessionStore = useSessionStore()
 const router = useRouter()
+
+// Forfeit modal state
+const showForfeitModal = ref(false)
+const isNavigationForfeit = ref(false)
+const pendingNavigation = ref<string | null>(null)
+const isForfeiting = ref(false)
 
 const isGameActive = computed(() => {
     return gameStore.gameStatus !== 'completed'
@@ -58,6 +65,61 @@ const onCancelMatchmaking = async () => {
     router.replace("/play")
 }
 
+// Forfeit functionality
+const onForfeitClick = () => {
+    isNavigationForfeit.value = false
+    showForfeitModal.value = true
+}
+
+const onConfirmForfeit = () => {
+    showForfeitModal.value = false
+    isForfeiting.value = true
+    gameStore.ForfeitGame()
+    
+    if (pendingNavigation.value) {
+        router.push(pendingNavigation.value)
+        pendingNavigation.value = null
+    }
+}
+
+const onCancelForfeit = () => {
+    showForfeitModal.value = false
+    pendingNavigation.value = null
+}
+
+// Navigation guard for forfeit warning
+onBeforeRouteLeave((to) => {
+    // Skip guard if we're already in the process of forfeiting
+    if (isForfeiting.value) {
+        return true
+    }
+    
+    // Only show warning if game is active (not waiting/ready/completed)
+    if (gameStore.gameStatus === 'active') {
+        isNavigationForfeit.value = true
+        pendingNavigation.value = to.fullPath
+        showForfeitModal.value = true
+        return false
+    }
+    return true
+})
+
+// Handle browser back/refresh during active game
+const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+    if (gameStore.gameStatus === 'active') {
+        e.preventDefault()
+        e.returnValue = ''
+    }
+}
+
+onMounted(() => {
+    window.addEventListener('beforeunload', handleBeforeUnload)
+})
+
+onUnmounted(() => {
+    window.removeEventListener('beforeunload', handleBeforeUnload)
+})
+
 // Player info for the header
 const player1 = computed(() => gameStore.player1)
 const player2 = computed(() => gameStore.player2)
@@ -92,6 +154,15 @@ const player2 = computed(() => gameStore.player2)
                 :error="gameError"
                 :clear-error="clearError"
             />
+
+            <!-- Forfeit Button -->
+            <button 
+                v-if="gameStore.gameStatus === 'active'" 
+                class="forfeit-btn"
+                @click="onForfeitClick"
+            >
+                Forfeit
+            </button>
         </div>
         
         <!-- Modals -->
@@ -105,6 +176,12 @@ const player2 = computed(() => gameStore.player2)
             :is-winning-player="isWinningPlayer" 
             :winning-reason="winningReason"
             @exit-game="onLeaveGame" 
+        />
+        <ForfeitConfirmModal
+            :show-modal="showForfeitModal"
+            :is-navigation-warning="isNavigationForfeit"
+            @confirm="onConfirmForfeit"
+            @cancel="onCancelForfeit"
         />
 
         <!-- Background decoration -->
@@ -140,6 +217,27 @@ const player2 = computed(() => gameStore.player2)
     flex-direction: column;
     min-height: 0;
     margin-bottom: 1rem;
+}
+
+/* Forfeit Button */
+.forfeit-btn {
+    font-family: monospace;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.5rem 1rem;
+    margin-top: 0.75rem;
+    border-radius: 0.5rem;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    align-self: center;
+}
+
+.forfeit-btn:hover {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.5);
 }
 
 /* Background decoration */

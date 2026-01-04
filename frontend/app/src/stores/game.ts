@@ -216,6 +216,18 @@ export const useGameStore = defineStore("game", () => {
         }
     }
 
+    const ForfeitGame = () => {
+        if (!gameId.value) {
+            return;
+        }
+
+        // Send forfeit action via WebSocket
+        useSocketStore().sendSocketMessage(JSON.stringify({
+            action: "forfeit",
+            gameId: gameId.value
+        }));
+    }
+
     const clearError = () => {
         error.value = null;
     }
@@ -224,7 +236,7 @@ export const useGameStore = defineStore("game", () => {
     return { 
         gameId, gameType, gameStatus, currentWord, currentTurnId, 
         player1, player2, gameTurns, winnerId, winReason, joinCode, error,
-        FindGame, CreatePrivateGame, JoinPrivateGame, SendWord, HandleGameUpdate, LeaveGame, CancelMatchmaking, clearError, $reset
+        FindGame, CreatePrivateGame, JoinPrivateGame, SendWord, HandleGameUpdate, LeaveGame, CancelMatchmaking, ForfeitGame, clearError, $reset
     }
 
 });
