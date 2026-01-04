@@ -155,3 +155,20 @@ func (s *Service) JoinPrivateGame(playerID string, playerName string, joinCode s
 		GameID: gameID,
 	}, nil
 }
+
+// CancelMatchmaking removes a waiting game from matchmaking
+// Only the game creator (player1) can cancel
+func (s *Service) CancelMatchmaking(gameID string, playerID string) error {
+	// First get the game to check its join code (for private games)
+	game, err := s.redisClient.GetGame(gameID)
+	if err != nil {
+		return err
+	}
+	if game.ID == "" {
+		return errors.New("game not found")
+	}
+
+	// AtomicCancelMatchmaking handles all validation (status, authorization)
+	// and cleanup (queue removal, code deletion, game deletion)
+	return s.redisClient.AtomicCancelMatchmaking(gameID, playerID, game.JoinCode)
+}

@@ -14,5 +14,6 @@ func GameRouter(app fiber.Router, game *gameService.Service, sess *sessionServic
 	app.Get("/find", handlers.FindGame(game))
 	app.Post("/private/create", handlers.CreatePrivateGame(game))
 	app.Post("/private/join", handlers.JoinPrivateGame(game))
+	app.Delete("/matchmaking/:id", handlers.CancelMatchmaking(game))
 	app.Get("/:id", handlers.GetGame(game))
 }

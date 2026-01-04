@@ -53,8 +53,8 @@ const onLeaveGame = () => {
     router.replace("/play")
 }
 
-const onCancelMatchmaking = () => {
-    gameStore.LeaveGame()
+const onCancelMatchmaking = async () => {
+    await gameStore.CancelMatchmaking()
     router.replace("/play")
 }
 

@@ -77,6 +77,74 @@ func (r *RedisClient) PopFromMatchmakingQueue() (string, error) {
 	return result, nil
 }
 
+// AtomicCancelMatchmaking atomically removes a waiting game from matchmaking
+// Removes from queue, deletes game hash, and deletes join code if present
+var cancelMatchmakingScript = `
+local gameKey = KEYS[1]
+local queueKey = KEYS[2]
+local codeKey = KEYS[3]
+local gameId = ARGV[1]
+local playerId = ARGV[2]
+
+-- Check game exists and is still waiting
+local status = redis.call('HGET', gameKey, 'status')
+if not status then
+    return {'', 'game_not_found'}
+end
+
+if status ~= 'waiting' then
+    return {'', 'game_already_started'}
+end
+
+-- Verify player is the game creator
+local player1Id = redis.call('HGET', gameKey, 'player1_id')
+if player1Id ~= playerId then
+    return {'', 'not_authorized'}
+end
+
+-- Remove from matchmaking queue
+redis.call('LREM', queueKey, 0, gameId)
+
+-- Delete join code if it exists
+if codeKey ~= '' then
+    redis.call('DEL', codeKey)
+end
+
+-- Delete the game hash
+redis.call('DEL', gameKey)
+
+return {'success', ''}
+`
+
+func (r *RedisClient) AtomicCancelMatchmaking(gameID string, playerID string, joinCode string) error {
+	gameKey := gameKeyPrefix + gameID
+	codeKey := ""
+	if joinCode != "" {
+		codeKey = privateGameCodePrefix + joinCode
+	}
+
+	result, err := r.client.Eval(ctx, cancelMatchmakingScript,
+		[]string{gameKey, matchmakingQueue, codeKey},
+		gameID, playerID,
+	).Result()
+
+	if err != nil {
+		return err
+	}
+
+	arr, ok := result.([]interface{})
+	if !ok || len(arr) < 2 {
+		return &AtomicOperationError{Message: "unexpected_result"}
+	}
+
+	errMsg, _ := arr[1].(string)
+	if errMsg != "" {
+		return &AtomicOperationError{Message: errMsg}
+	}
+
+	return nil
+}
+
 // PublishGameEvent publishes an event to the game's pub/sub channel
 func (r *RedisClient) PublishGameEvent(gameID string, event string) error {
 	channel := gameKeyPrefix + gameID

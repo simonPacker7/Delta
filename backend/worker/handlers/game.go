@@ -87,3 +87,26 @@ func JoinPrivateGame(game *gameService.Service) fiber.Handler {
 		return c.JSON(response)
 	}
 }
+
+func CancelMatchmaking(game *gameService.Service) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		sessionCtx, ok := c.Locals("sessionContext").(entities.SessionContext)
+		if !ok {
+			return c.SendStatus(fiber.StatusUnauthorized)
+		}
+
+		gameID := c.Params("id")
+		if gameID == "" {
+			c.Status(fiber.StatusBadRequest)
+			return c.JSON(ErrorResponse(fiber.NewError(fiber.StatusBadRequest, "game ID is required")))
+		}
+
+		err := game.CancelMatchmaking(gameID, sessionCtx.ID)
+		if err != nil {
+			c.Status(fiber.StatusBadRequest)
+			return c.JSON(ErrorResponse(err))
+		}
+
+		return c.JSON(fiber.Map{"status": "cancelled"})
+	}
+}

@@ -192,6 +192,30 @@ export const useGameStore = defineStore("game", () => {
         $reset();
     }
 
+    const CancelMatchmaking = async () => {
+        if (!gameId.value) {
+            $reset();
+            return;
+        }
+
+        try {
+            // First unsubscribe from WebSocket
+            useSocketStore().sendSocketMessage(JSON.stringify({
+                action: "leave_game",
+                gameId: gameId.value
+            }));
+
+            // Then call the cancel API to cleanup Redis
+            await axios.delete(`/api/game/matchmaking/${gameId.value}`);
+        }
+        catch (err) {
+            console.log("Error cancelling matchmaking:", err);
+        }
+        finally {
+            $reset();
+        }
+    }
+
     const clearError = () => {
         error.value = null;
     }
@@ -200,7 +224,7 @@ export const useGameStore = defineStore("game", () => {
     return { 
         gameId, gameType, gameStatus, currentWord, currentTurnId, 
         player1, player2, gameTurns, winnerId, winReason, joinCode, error,
-        FindGame, CreatePrivateGame, JoinPrivateGame, SendWord, HandleGameUpdate, LeaveGame, clearError, $reset
+        FindGame, CreatePrivateGame, JoinPrivateGame, SendWord, HandleGameUpdate, LeaveGame, CancelMatchmaking, clearError, $reset
     }
 
 });
